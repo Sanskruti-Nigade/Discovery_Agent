@@ -1,0 +1,169 @@
+{
+  "mdm_product_api": {
+    "product_meta": {
+      "version": {
+        "data_type": "string"
+      },
+      "version_release_date": {
+        "data_type": "date"
+      }
+    },
+    "model_product": {
+      "id": {
+        "data_type": "string",
+        "pk": true
+      },
+      "class": {
+        "data_type": "string"
+      },
+      "active": {
+        "data_type": "boolean"
+      },
+      "category": {
+        "data_type": "string"
+      },
+      "product_status": {
+        "data_type": "string"
+      },
+      "term_type": {
+        "data_type": "string"
+      },
+      "subclass": {
+        "data_type": "string"
+      },
+      "pricing_method": {
+        "data_type": "string"
+      }
+    },
+    "entitlement_product": {
+      "id": {
+        "data_type": "string",
+        "pk": true
+      },
+      "class": {
+        "data_type": "string"
+      },
+      "name": {
+        "data_type": "string"
+      },
+      "model_id": {
+        "data_type": "string",
+        "fk": "model_product.id"
+      },
+      "product_status": {
+        "data_type": "string"
+      },
+      "release": {
+        "data_type": "string"
+      },
+      "target_release": {
+        "data_type": "string"
+      },
+      "long_desc": {
+        "data_type": "string"
+      },
+      "has_license_component": {
+        "data_type": "boolean"
+      },
+      "variable_price_eligible": {
+        "data_type": "boolean"
+      }
+    },
+    "entitlement_product_lifecycle": {
+      "product_id": {
+        "data_type": "string",
+        "fk": "entitlement_product.id"
+      },
+      "geography": {
+        "data_type": "string"
+      },
+      "lifecycle_phase": {
+        "data_type": "string"
+      },
+      "start_date": {
+        "data_type": "date"
+      },
+      "end_date": {
+        "data_type": "date"
+      }
+    }
+  },
+  "mdm_product_contact_api": {
+    "contact_response": {
+      "person_id": {
+        "data_type": "string",
+        "pk": true,
+        "fk": "mdm_product_api.model_product.id"
+      },
+      "event_timestamp": {
+        "data_type": "timestamp"
+      }
+    },
+    "contact_profile": {
+      "number": {
+        "data_type": "string",
+        "pk": true
+      },
+      "person_id": {
+        "data_type": "string",
+        "fk": "contact_response.person_id"
+      },
+      "display_name": {
+        "data_type": "string"
+      },
+      "company": {
+        "data_type": "string"
+      },
+      "primary_account": {
+        "data_type": "string"
+      },
+      "status": {
+        "data_type": "string"
+      },
+      "source_system": {
+        "data_type": "string"
+      },
+      "first_name": {
+        "data_type": "string"
+      },
+      "last_name": {
+        "data_type": "string"
+      },
+      "primary_email": {
+        "data_type": "string"
+      },
+      "city": {
+        "data_type": "string"
+      },
+      "country": {
+        "data_type": "string"
+      },
+      "mdm_id": {
+        "data_type": "string"
+      },
+      "job_title": {
+        "data_type": "string"
+      },
+      "job_role": {
+        "data_type": "string"
+      },
+      "job_function": {
+        "data_type": "string"
+      },
+      "job_level": {
+        "data_type": "string"
+      }
+    },
+    "contact_metadata": {
+      "mdm_version": {
+        "data_type": "string"
+      },
+      "published_by": {
+        "data_type": "string"
+      },
+      "environment": {
+        "data_type": "string"
+      }
+    }
+  }
+}

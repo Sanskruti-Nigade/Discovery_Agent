@@ -1,0 +1,67 @@
+{
+  "Product_Response": {
+    "META": {
+      "VERSION": "2.0.0",
+      "VERSION_RELEASE_DATE": "2026-02-04"
+    },
+    "MODEL_PRODUCT": {
+      "ID": "MOD53654",
+      "CLASS": "Model",
+      "ACTIVE": false,
+      "CATEGORY": "Plugins",
+      "PRODUCT_STATUS": "Active",
+      "TERM_TYPE": "One-time",
+      "SUBCLASS": "Plugins",
+      "PRICING_METHOD": "one_time"
+    },
+    "ENTITLEMENT_PRODUCT": {
+      "ID": "PROD106699",
+      "CLASS": "Product",
+      "NAME": "Beans.ai Spoke",
+      "MODEL_ID": "MOD53654",
+      "PRODUCT_STATUS": "Active",
+      "RELEASE": "Vancouver",
+      "TARGET_RELEASE": "Australia",
+      "LONG_DESC": "The Beans.ai Spoke for IntegrationHub provides actions that a Process Analyst can use when designing flows. The actions allow them to read geospatial data from Beans.ai",
+      "HAS_LICENSE_COMPONENT": true,
+      "VARIABLE_PRICE_ELIGIBLE": true,
+      "LIFECYCLE": [
+        {
+          "GEOGRAPHY": "Global",
+          "LIFECYCLE_PHASE": "General Availability",
+          "START_DATE": "2026-07-06",
+          "END_DATE": "9999-12-31"
+        }
+      ]
+    }
+  },
+  "Contact_Response": {
+    "person_id": "PID100017487511",
+    "event_timestamp": "2026-06-20T03:51:06Z",
+    "profile": [
+      {
+        "number": "CONT0013862154",
+        "display_name": "Pietra Matteo",
+        "company": "Genentech Inc",
+        "primary_account": "800000003606",
+        "status": "Active",
+        "source_system": "CRM",
+        "first_name": "Pietra",
+        "last_name": "Matteo",
+        "primary_email": "pietra.matteo@gene.com",
+        "city": "South San Francisco",
+        "country": "US",
+        "mdm_id": "74325542",
+        "job_title": "Chief Financial Officer",
+        "job_role": "Finance/Accounting",
+        "job_function": "CFO",
+        "job_level": "C-Level"
+      }
+    ],
+    "metadata": {
+      "mdm_version": "1.0",
+      "published_by": "servicenow.mdm.edapublisher",
+      "environment": "dev"
+    }
+  }
+}

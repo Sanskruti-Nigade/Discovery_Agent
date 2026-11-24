@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+neo4j
+pyyaml
+python-dotenv
+requests
+sentence-transformers
+psycopg2-binary

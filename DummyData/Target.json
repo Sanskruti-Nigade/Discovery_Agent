@@ -1,0 +1,60 @@
+{
+  "dim_model": {
+    "model_id": "MOD53654",
+    "model_class": "Model",
+    "is_active": true,
+    "model_category": "Plugins",
+    "model_status": "Active",
+    "term_type": "One-time",
+    "model_subclass": "Plugins",
+    "pricing_method": "one_time",
+    "schema_version": "2.0.0"
+  },
+  "dim_product": {
+    "product_id": "PROD106699",
+    "product_class": "Product",
+    "product_name": "Beans.ai Spoke",
+    "model_id": "MOD53654",
+    "product_status": "Active",
+    "release_name": "Vancouver",
+    "target_release_name": "Australia",
+    "product_description": "The Beans.ai Spoke for IntegrationHub provides actions that a Process Analyst can use when designing flows. The actions allow them to read geospatial data from Beans.ai",
+    "has_license_component": true,
+    "is_variable_price_eligible": true
+  },
+  "fact_product_lifecycle": [
+    {
+      "product_id": "PROD106699",
+      "geography": "Global",
+      "lifecycle_phase": "General Availability",
+      "lifecycle_start_date": "2026-07-06",
+      "lifecycle_end_date": "9999-12-31"
+    }
+  ],
+  "dim_contact_event": {
+    "person_id": "PID100017487511",
+    "event_timestamp": "2026-06-20T03:51:06Z",
+    "mdm_version": "1.0",
+    "published_by": "servicenow.mdm.edapublisher",
+    "environment": "dev"
+  },
+  "dim_contact": {
+    "contact_number": "CONT0013862154",
+    "person_id": "PID100017487511",
+    "display_name": "Pietra Matteo",
+    "company_name": "Genentech Inc",
+    "primary_account": "800000003606",
+    "contact_status": "Active",
+    "source_system": "CRM",
+    "first_name": "Pietra",
+    "last_name": "Matteo",
+    "primary_email": "pietra.matteo@gene.com",
+    "city": "South San Francisco",
+    "country": "US",
+    "mdm_id": "74325542",
+    "job_title": "Chief Financial Officer",
+    "job_role": "Finance/Accounting",
+    "job_function": "CFO",
+    "job_level": "C-Level"
+  }
+}

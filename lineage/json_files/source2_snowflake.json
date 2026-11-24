@@ -1,0 +1,159 @@
+{
+  "snowflake": {
+    "dim_model": {
+      "model_id": {
+        "data_type": "VARCHAR",
+        "pk": true
+      },
+      "model_class": {
+        "data_type": "VARCHAR"
+      },
+      "is_active": {
+        "data_type": "BOOLEAN"
+      },
+      "model_category": {
+        "data_type": "VARCHAR"
+      },
+      "model_status": {
+        "data_type": "VARCHAR"
+      },
+      "term_type": {
+        "data_type": "VARCHAR"
+      },
+      "model_subclass": {
+        "data_type": "VARCHAR"
+      },
+      "pricing_method": {
+        "data_type": "VARCHAR"
+      },
+      "schema_version": {
+        "data_type": "VARCHAR"
+      }
+    },
+    "dim_product": {
+      "product_id": {
+        "data_type": "VARCHAR",
+        "pk": true
+      },
+      "product_class": {
+        "data_type": "VARCHAR"
+      },
+      "product_name": {
+        "data_type": "VARCHAR"
+      },
+      "model_id": {
+        "data_type": "VARCHAR",
+        "fk": "dim_model.model_id"
+      },
+      "product_status": {
+        "data_type": "VARCHAR"
+      },
+      "release_name": {
+        "data_type": "VARCHAR"
+      },
+      "target_release_name": {
+        "data_type": "VARCHAR"
+      },
+      "product_description": {
+        "data_type": "VARCHAR"
+      },
+      "has_license_component": {
+        "data_type": "BOOLEAN"
+      },
+      "is_variable_price_eligible": {
+        "data_type": "BOOLEAN"
+      }
+    },
+    "fact_product_lifecycle": {
+      "product_id": {
+        "data_type": "VARCHAR",
+        "fk": "dim_product.product_id"
+      },
+      "geography": {
+        "data_type": "VARCHAR"
+      },
+      "lifecycle_phase": {
+        "data_type": "VARCHAR"
+      },
+      "lifecycle_start_date": {
+        "data_type": "DATE"
+      },
+      "lifecycle_end_date": {
+        "data_type": "DATE"
+      }
+    },
+    "dim_contact_event": {
+      "person_id": {
+        "data_type": "VARCHAR",
+        "pk": true
+      },
+      "event_timestamp": {
+        "data_type": "TIMESTAMP"
+      },
+      "mdm_version": {
+        "data_type": "VARCHAR"
+      },
+      "published_by": {
+        "data_type": "VARCHAR"
+      },
+      "environment": {
+        "data_type": "VARCHAR"
+      }
+    },
+    "dim_contact": {
+      "contact_number": {
+        "data_type": "VARCHAR",
+        "pk": true
+      },
+      "person_id": {
+        "data_type": "VARCHAR",
+        "fk": "dim_contact_event.person_id"
+      },
+      "display_name": {
+        "data_type": "VARCHAR"
+      },
+      "company_name": {
+        "data_type": "VARCHAR"
+      },
+      "primary_account": {
+        "data_type": "VARCHAR"
+      },
+      "contact_status": {
+        "data_type": "VARCHAR"
+      },
+      "source_system": {
+        "data_type": "VARCHAR"
+      },
+      "first_name": {
+        "data_type": "VARCHAR"
+      },
+      "last_name": {
+        "data_type": "VARCHAR"
+      },
+      "primary_email": {
+        "data_type": "VARCHAR"
+      },
+      "city": {
+        "data_type": "VARCHAR"
+      },
+      "country": {
+        "data_type": "VARCHAR"
+      },
+      "mdm_id": {
+        "data_type": "VARCHAR"
+      },
+      "job_title": {
+        "data_type": "VARCHAR"
+      },
+      "job_role": {
+        "data_type": "VARCHAR"
+      },
+      "job_function": {
+        "data_type": "VARCHAR"
+      },
+      "job_level": {
+        "data_type": "VARCHAR"
+      }
+    }
+  }
+}

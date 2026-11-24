@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lineage Q&amp;A</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1b1f24;--muted:#667085;--accent:#2563eb;--border:#e2e5ea}
+@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--text:#e8eaed;--muted:#9aa3af;--accent:#60a5fa;--border:#2c323b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
+header{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--card)}header h1{margin:0;font-size:17px}
+#status{font-size:12px;color:var(--muted)}
+#chat{flex:1;overflow:auto;padding:16px;max-width:860px;width:100%;margin:0 auto}
+.msg{margin:10px 0;padding:10px 14px;border-radius:10px;max-width:88%;white-space:pre-wrap;word-wrap:break-word}
+.user{background:var(--accent);color:#fff;margin-left:auto}.bot{background:var(--card);border:1px solid var(--border)}
+table.imp{margin-top:10px;font-size:13px}table.imp th{background:var(--bg)}details{margin-top:8px;font-size:13px;color:var(--muted)}table{border-collapse:collapse;margin-top:6px;font-size:12px}td,th{border:1px solid var(--border);padding:3px 8px;text-align:left}
+form{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:var(--card)}
+input{flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+button{padding:10px 18px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;cursor:pointer}button:disabled{opacity:.6}
+.hint{color:var(--muted);font-size:13px;margin:6px 0}.hint a{color:var(--accent);cursor:pointer;text-decoration:underline}
+</style></head><body>
+<header><h1>Lineage Q&amp;A</h1><a href="/graph" style="float:right;color:var(--accent);font-size:13px">Graph view</a><div id="status">checking Neo4j...</div></header>
+<div id="chat"><div class="hint">Ask about a column, table or system. Try:
+<a>Where does dim_model.schema_version come from?</a> &middot; <a>What does model_product.id feed?</a> &middot; <a>columns of dim_product</a> &middot; <a>What is impacted if I change model_product.id?</a> &middot; <a>show latest changes and previous</a></div></div>
+<form id="f"><input id="q" placeholder="Ask a question about your data lineage..." autocomplete="off" autofocus><button id="b">Ask</button></form>
+<script>
+const f=document.getElementById('f'),chat=document.getElementById('chat'),q=document.getElementById('q'),b=document.getElementById('b');
+function add(cls,text){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d}
+fetch('/api/health').then(r=>r.json()).then(h=>{document.getElementById('status').textContent=h.neo4j?'Neo4j connected: '+h.counts.map(c=>c.n+' '+c.label).join(', '):'Neo4j not reachable: '+h.error}).catch(()=>{});
+document.querySelectorAll('.hint a').forEach(a=>a.onclick=()=>{q.value=a.textContent;f.requestSubmit()});
+f.onsubmit=async e=>{e.preventDefault();const text=q.value.trim();if(!text)return;q.value='';add('user',text);b.disabled=true;const w=add('bot','Searching Neo4j...');
+ try{const r=await(await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text})})).json();
+  w.textContent=r.answer;
+  if(r.clarify){const box=document.createElement('div');box.style.marginTop='8px';
+   r.clarify.options.forEach(o=>{const bt=document.createElement('button');bt.type='button';bt.textContent=o.name+' ('+o.kind+')';bt.style.cssText='margin:4px 6px 0 0;cursor:pointer';
+    bt.onclick=()=>{box.querySelectorAll('button').forEach(x=>x.disabled=true);q.value=text.split(r.clarify.term).join(o.name);f.requestSubmit()};box.appendChild(bt)});w.appendChild(box)}
+  if(r.history&&r.history.length){const t=document.createElement('table');t.className='imp';
+   t.innerHTML='<tr><th>Order</th><th>When</th><th>Change</th><th>System</th><th>Table</th><th>Column</th><th>Previous</th><th>Latest</th></tr>';
+   r.history.forEach(m=>{const tr=t.insertRow();[m.order,m.when,m.what,m.system,m.table,m.column,m.previous,m.latest].forEach(v=>tr.insertCell().textContent=v);if(m.order==='Latest')tr.style.fontWeight='600'});
+   const wrap=document.createElement('div');wrap.style.overflowX='auto';wrap.appendChild(t);w.appendChild(wrap)}
+  if(r.impact&&r.impact.length){const t=document.createElement('table');t.className='imp';
+   t.innerHTML='<tr><th>Changed column</th><th>Impacted system</th><th>Impacted table</th><th>Impacted column</th><th>Type</th><th>Hops</th><th>Path</th></tr>';
+   r.impact.forEach(m=>{const tr=t.insertRow();[m.changed,m.system,m.table,m.column,m.data_type,m.level,m.path].forEach(v=>tr.insertCell().textContent=v)});
+   const wrap=document.createElement('div');wrap.style.overflowX='auto';wrap.appendChild(t);w.appendChild(wrap)}
+  if(r.matches&&r.matches.length){const d=document.createElement('details');d.innerHTML='<summary>'+r.matches.length+' matching column(s) in Neo4j</summary>';
+   const t=document.createElement('table');t.innerHTML='<tr><th>Column</th><th>Type</th><th>From</th><th>Feeds</th></tr>';
+   r.matches.forEach(m=>{const tr=t.insertRow();[m.system+'.'+m.table+'.'+m.name,m.data_type||'',m.upstream.length,m.downstream.length].forEach(v=>tr.insertCell().textContent=v)});d.appendChild(t);w.appendChild(d)}
+ }catch(err){w.textContent='Error: '+err}b.disabled=false;q.focus()};
+</script></body></html>

@@ -1,0 +1,9 @@
+.env
+__pycache__/
+
+*.log
+*.pyc
+.venv/
+node_modules/
+ai/generated/*
+!ai/generated/.gitkeep

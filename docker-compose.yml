@@ -1,0 +1,62 @@
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: discovery-neo4j
+    restart: unless-stopped
+    ports:
+      # Standard Neo4j host ports (stop Neo4j Desktop first if it uses them).
+      - "7474:7474"   # Browser UI  -> http://localhost:7474
+      - "7687:7687"   # Bolt        -> bolt://localhost:7687
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-ChangeMe12345}
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+
+  postgres:
+    image: postgres:16
+    container_name: discovery-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"   # host 5433 -> container 5432 (avoids clashing with a local Postgres)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-discovery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-discovery123}
+      POSTGRES_DB: ${POSTGRES_DB:-discovery}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: drop .sql dumps in ./db_init to auto-load on first start
+      - ./db_init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    image: discovery-agent:latest
+    container_name: discovery-api
+    restart: unless-stopped
+    depends_on:
+      - neo4j
+      - postgres
+    ports:
+      - "8000:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687   # container-to-container, uses the internal port
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-ChangeMe12345}
+      NEO4J_DATABASE: neo4j
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-discovery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-discovery123}
+      POSTGRES_DB: ${POSTGRES_DB:-discovery}
+    volumes:
+      - ./yml_files:/app/yml_files:ro   # edit YAML without rebuilding the image
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  postgres_data:
