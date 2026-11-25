@@ -17,8 +17,10 @@ from pydantic import BaseModel
 ROOT = Path(__file__).parent.parent
 load_dotenv(ROOT / ".env")
 sys.path.insert(0, str(ROOT / "ai"))
+sys.path.insert(0, str(ROOT))
 
 import query_gen  # noqa: E402
+from mapping.api import router as schema_mapping_router  # noqa: E402
 from query_gen import Q  # noqa: E402
 
 URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -34,6 +36,7 @@ UP = re.compile(r"\b(come|comes|coming|source|sources|upstream|derived|originat\
 DOWN = re.compile(r"\b(downstream|used|use|feeds?|impact\w*|goes? to|flows? to|maps? to|target|targets)\b", re.I)
 
 app = FastAPI(title="Discovery Agent - lineage Q&A")
+app.include_router(schema_mapping_router)  # /api/schema-mapping/* (Postgres review queue, see mapping/)
 _driver = None
 
 
@@ -405,16 +408,41 @@ def _graph_nodes(rows, edges):
 
 
 app.mount("/lib", StaticFiles(directory=ROOT / "lineage" / "lib" / "vis-9.1.2"), name="lib")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+
+# The React UI (ui/, built with `npm run build`) is served from ui/dist when it exists. Without a build
+# the original HTML pages are served, so the chat keeps working.
+UI_DIST = ROOT / "ui" / "dist"
+if (UI_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=UI_DIST / "assets"), name="assets")
+
+
+def _page(classic: str):
+    if (UI_DIST / "index.html").is_file():
+        return FileResponse(UI_DIST / "index.html")
+    return FileResponse(Path(__file__).parent / "static" / classic)
 
 
 @app.get("/graph")
 def graph_page():
-    return FileResponse(Path(__file__).parent / "static" / "graph.html")
+    return _page("graph.html")
 
 
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+@app.get("/reviews")
+def reviews_page():
+    return _page("index.html")
 
 
 @app.get("/")
 def index():
-    return FileResponse(Path(__file__).parent / "static" / "index.html")
+    return _page("index.html")
+
+
+@app.get("/{name}.{ext}")
+def ui_public_file(name: str, ext: str):
+    """Files from ui/public copied into the build (logo, favicon)."""
+    p = UI_DIST / f"{name}.{ext}"
+    if UI_DIST.is_dir() and p.is_file() and p.parent == UI_DIST:
+        return FileResponse(p)
+    from fastapi import HTTPException
+    raise HTTPException(404)

@@ -3,3 +3,5 @@ uvicorn
 neo4j
 python-dotenv
 requests
+psycopg[binary]
+pyyaml
