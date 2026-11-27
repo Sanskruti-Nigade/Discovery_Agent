@@ -19,22 +19,34 @@ if PROVIDER in ("", "stub"):  # none chosen (or the mock, which can't write Cyph
 def chat(system: str, user: str, max_tokens: int = 4000) -> str:
     """Send one system+user prompt, return the model's text."""
     if PROVIDER == "anthropic":
-        r = requests.post(
-            os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1").rstrip("/") + "/messages",
-            headers={"x-api-key": _need("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"},
-            json={"model": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5-5"), "max_tokens": max_tokens,
-                  "system": system, "messages": [{"role": "user", "content": user}]},
-            timeout=120)
-        r.raise_for_status()
-        return "".join(b.get("text", "") for b in r.json()["content"] if b.get("type") == "text")
+        url = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1").rstrip("/") + "/messages"
+        headers = {"x-api-key": _need("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"}
+        out, prompt = "", user
+        for _ in range(8):  # a long reply that hits the token limit is continued, then stitched together
+            r = requests.post(url, headers=headers, timeout=300, json={
+                "model": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5-5"), "max_tokens": max_tokens,
+                "thinking": {"type": "between_tools"},  # no hidden reasoning: it ate the output budget
+                "system": system, "messages": [{"role": "user", "content": prompt}]})
+            if not r.ok:  # show the API's own message (limit reached, bad key, ...), not just "400"
+                raise RuntimeError(f"Anthropic API error {r.status_code}: {r.text[:500]}")
+            j = r.json()
+            out += "".join(b.get("text", "") for b in j["content"] if b.get("type") == "text")
+            if j.get("stop_reason") != "max_tokens":
+                return out
+            prompt = (f"{user}\n\n[Your previous reply was cut off by the length limit. It ended with:\n{out[-400:]}\n"
+                      "Continue from exactly the next character. Output ONLY the remaining text, no repeats, no fences.]")
+        return out
 
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if PROVIDER == "llama":  # self-hosted Ollama-style server: POST {base}/chat
         r = requests.post(
             os.getenv("LLAMA_BASE_URL", "").rstrip("/") + "/chat", **llama_auth(),
             json={"model": os.getenv("LLAMA_MODEL", "llama3.1:8b"), "messages": msgs, "stream": False,
-                  "options": {"temperature": 0, "num_predict": max_tokens}},
-            timeout=300, verify=os.getenv("LLAMA_VERIFY_SSL", "true").lower() != "false")
+                  "think": os.getenv("LLAMA_THINK", "false").lower() == "true",  # reasoning models: slow, off by default
+                  "options": {"temperature": 0, "num_predict": max_tokens,
+                        # Ollama's default context is tiny and silently cuts long prompts: ask for a big one
+                        "num_ctx": int(os.getenv("LLAMA_NUM_CTX", "65536"))}},
+            timeout=int(os.getenv("LLAMA_TIMEOUT", "1200")), verify=os.getenv("LLAMA_VERIFY_SSL", "true").lower() != "false")
         r.raise_for_status()
         return r.json()["message"]["content"]
     if PROVIDER == "openai":

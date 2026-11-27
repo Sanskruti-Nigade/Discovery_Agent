@@ -1,50 +1,269 @@
 {
-  "mapping": [
-    "Product_Response.MODEL_PRODUCT.ID -> dim_model.model_id",
-    "Product_Response.MODEL_PRODUCT.CLASS -> dim_model.model_class",
-    "Product_Response.MODEL_PRODUCT.ACTIVE -> dim_model.is_active",
-    "Product_Response.MODEL_PRODUCT.CATEGORY -> dim_model.model_category",
-    "Product_Response.MODEL_PRODUCT.PRODUCT_STATUS -> dim_model.model_status",
-    "Product_Response.MODEL_PRODUCT.TERM_TYPE -> dim_model.term_type",
-    "Product_Response.MODEL_PRODUCT.SUBCLASS -> dim_model.model_subclass",
-    "Product_Response.MODEL_PRODUCT.PRICING_METHOD -> dim_model.pricing_method",
-    "Product_Response.META.VERSION -> dim_model.schema_version",
-    "Product_Response.ENTITLEMENT_PRODUCT.ID -> dim_product.product_id",
-    "Product_Response.ENTITLEMENT_PRODUCT.CLASS -> dim_product.product_class",
-    "Product_Response.ENTITLEMENT_PRODUCT.NAME -> dim_product.product_name",
-    "Product_Response.ENTITLEMENT_PRODUCT.MODEL_ID -> dim_product.model_id",
-    "Product_Response.ENTITLEMENT_PRODUCT.PRODUCT_STATUS -> dim_product.product_status",
-    "Product_Response.ENTITLEMENT_PRODUCT.RELEASE -> dim_product.release_name",
-    "Product_Response.ENTITLEMENT_PRODUCT.TARGET_RELEASE -> dim_product.target_release_name",
-    "Product_Response.ENTITLEMENT_PRODUCT.LONG_DESC -> dim_product.product_description",
-    "Product_Response.ENTITLEMENT_PRODUCT.HAS_LICENSE_COMPONENT -> dim_product.has_license_component",
-    "Product_Response.ENTITLEMENT_PRODUCT.VARIABLE_PRICE_ELIGIBLE -> dim_product.is_variable_price_eligible",
-    "Product_Response.ENTITLEMENT_PRODUCT.ID -> fact_product_lifecycle.product_id",
-    "Product_Response.ENTITLEMENT_PRODUCT.LIFECYCLE[].GEOGRAPHY -> fact_product_lifecycle.geography",
-    "Product_Response.ENTITLEMENT_PRODUCT.LIFECYCLE[].LIFECYCLE_PHASE -> fact_product_lifecycle.lifecycle_phase",
-    "Product_Response.ENTITLEMENT_PRODUCT.LIFECYCLE[].START_DATE -> fact_product_lifecycle.lifecycle_start_date",
-    "Product_Response.ENTITLEMENT_PRODUCT.LIFECYCLE[].END_DATE -> fact_product_lifecycle.lifecycle_end_date",
-    "Contact_Response.person_id -> dim_contact_event.person_id",
-    "Contact_Response.event_timestamp -> dim_contact_event.event_timestamp",
-    "Contact_Response.metadata.mdm_version -> dim_contact_event.mdm_version",
-    "Contact_Response.metadata.published_by -> dim_contact_event.published_by",
-    "Contact_Response.metadata.environment -> dim_contact_event.environment",
-    "Contact_Response.profile[].number -> dim_contact.contact_number",
-    "Contact_Response.person_id -> dim_contact.person_id",
-    "Contact_Response.profile[].display_name -> dim_contact.display_name",
-    "Contact_Response.profile[].company -> dim_contact.company_name",
-    "Contact_Response.profile[].primary_account -> dim_contact.primary_account",
-    "Contact_Response.profile[].status -> dim_contact.contact_status",
-    "Contact_Response.profile[].source_system -> dim_contact.source_system",
-    "Contact_Response.profile[].first_name -> dim_contact.first_name",
-    "Contact_Response.profile[].last_name -> dim_contact.last_name",
-    "Contact_Response.profile[].primary_email -> dim_contact.primary_email",
-    "Contact_Response.profile[].city -> dim_contact.city",
-    "Contact_Response.profile[].country -> dim_contact.country",
-    "Contact_Response.profile[].mdm_id -> dim_contact.mdm_id",
-    "Contact_Response.profile[].job_title -> dim_contact.job_title",
-    "Contact_Response.profile[].job_role -> dim_contact.job_role",
-    "Contact_Response.profile[].job_function -> dim_contact.job_function",
-    "Contact_Response.profile[].job_level -> dim_contact.job_level"
-  ]
+  "schema_version": 2,
+  "entity_mapping": {
+    "source_entity": "contact",
+    "target_entity": "contact",
+    "source_system": "MDM",
+    "target_system": "dynamics-365",
+    "model": "claude-opus-4-6",
+    "overall_confidence": {
+      "score": 0.16,
+      "method": "coverage_weighted_model_estimate",
+      "scope": "full_entity",
+      "validated": false
+    },
+    "coverage": {
+      "target_fields_total": 184,
+      "target_fields_processed": 184,
+      "proposed_mappings": 38,
+      "needs_review": 146
+    },
+    "mappings": [
+      {
+        "source": "profile[].job_function",
+        "target": "_sn_jobfunction_value",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].job_function represents a contact's job function, which aligns with the _sn_jobfunction_value lookup field in Dynamics 365; however, value mapping between source values and target option-set/lookup IDs cannot be confirmed without reference data, so confidence is medium"
+      },
+      {
+        "source": "profile[].job_level",
+        "target": "_sn_joblevel_value",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].job_level represents the contact's job level, which corresponds to _sn_joblevel_value as a job level lookup; actual ID/code equivalence cannot be verified without reference data"
+      },
+      {
+        "source": "profile[].city",
+        "target": "address1_city",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].city represents the contact's city, which maps to the primary address city in Dynamics 365"
+      },
+      {
+        "source": "profile[].address_line_1",
+        "target": "address1_line1",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].address_line_1 represents the first line of the contact's address, mapping to address1_line1 in Dynamics 365"
+      },
+      {
+        "source": "profile[].postal_code",
+        "target": "address1_postalcode",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].postal_code represents the contact's postal/zip code, mapping to address1_postalcode in Dynamics 365"
+      },
+      {
+        "source": "profile[].created_on",
+        "target": "createdon",
+        "relation": "maps_to",
+        "transformation": "Convert to Dynamics 365 datetime format",
+        "reason": "profile[].created_on represents the creation timestamp of the contact record, which aligns with createdon as the record creation date in Dynamics 365"
+      },
+      {
+        "source": "profile[].share_with_marketing",
+        "target": "donotsendmm",
+        "relation": "maps_to",
+        "transformation": "Invert boolean: share_with_marketing=true → donotsendmm=false",
+        "reason": "profile[].share_with_marketing indicates marketing consent; donotsendmm is the Dynamics 365 opt-out flag for marketing materials, requiring boolean inversion"
+      },
+      {
+        "source": "profile[].primary_email",
+        "target": "emailaddress1",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].primary_email represents the contact's primary email address, which maps directly to emailaddress1 in Dynamics 365"
+      },
+      {
+        "source": "profile[].first_name",
+        "target": "firstname",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].first_name represents the contact's given name, directly corresponding to the firstname field in Dynamics 365"
+      },
+      {
+        "source": "profile[].communication[].opt_in",
+        "target": "followemail",
+        "relation": "maps_to",
+        "transformation": "Filter communication[] where type='email' and primary=true; map opt_in boolean to followemail",
+        "reason": "profile[].communication[].opt_in for email-type communications indicates email follow/subscription preference, which conceptually aligns with followemail; however, requires type filter for email and mapping is not exact"
+      },
+      {
+        "source": "profile[].display_name",
+        "target": "fullname",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].display_name represents the contact's assembled display name, which aligns with the fullname field in Dynamics 365"
+      },
+      {
+        "source": "profile[].job_title",
+        "target": "jobtitle",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].job_title represents the contact's job title, directly corresponding to the jobtitle field in Dynamics 365"
+      },
+      {
+        "source": "profile[].last_name",
+        "target": "lastname",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].last_name represents the contact's surname, directly corresponding to the lastname field in Dynamics 365"
+      },
+      {
+        "source": "profile[].share_with_marketing",
+        "target": "marketingonly",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].share_with_marketing indicates whether the contact is shared for marketing purposes, which aligns with the marketingonly boolean flag in Dynamics 365"
+      },
+      {
+        "source": "profile[].last_updated",
+        "target": "modifiedon",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].last_updated represents the last modification timestamp of the profile, corresponding to modifiedon in Dynamics 365"
+      },
+      {
+        "source": "profile[].anonymize",
+        "target": "msdyn_gdproptout",
+        "relation": "maps_to",
+        "transformation": "Map boolean: true → GDPR opt-out true",
+        "reason": "profile[].anonymize indicates the contact should be anonymized, which aligns with the GDPR opt-out flag in Dynamics 365"
+      },
+      {
+        "source": "profile[].lead",
+        "target": "originatingleadid (reference)",
+        "relation": "maps_to",
+        "transformation": "Resolve lead identifier to Dynamics 365 lead entity reference",
+        "reason": "profile[].lead holds a reference to a lead record, which corresponds to the originating lead lookup on the contact entity"
+      },
+      {
+        "source": "profile[].account_relationship[].account",
+        "target": "parentcustomerid (reference via _parentcustomerid_value)",
+        "relation": "maps_to",
+        "transformation": "Resolve account identifier to Dynamics 365 account entity reference",
+        "reason": "profile[].account_relationship[].account represents the associated account entity, which aligns with parentcustomerid as a reference to the parent customer (account) in Dynamics 365"
+      },
+      {
+        "source": "profile[].account_relationship[].number",
+        "target": "parentcustomerid.accountnumber",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].account_relationship[].number represents the account number within the relationship, which maps to the account number on the parent customer account record"
+      },
+      {
+        "source": "profile[].share_with_marketing",
+        "target": "parentcustomerid.donotsendmm",
+        "relation": "maps_to",
+        "transformation": "Invert boolean: share_with_marketing=true → donotsendmm=false",
+        "reason": "profile[].share_with_marketing indicates consent to receive marketing; donotsendmm is the inverse flag on the parent account indicating do-not-send marketing material"
+      },
+      {
+        "source": "profile[].anonymize",
+        "target": "parentcustomerid.msdyn_gdproptout",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].anonymize signals the contact/account should be anonymized under privacy regulations, aligning with the GDPR opt-out flag on the parent account"
+      },
+      {
+        "source": "profile[].account_relationship[].account",
+        "target": "parentcustomerid.name",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].account_relationship[].account represents the account name/identifier associated with the contact, which maps to the parent customer (account) name in Dynamics 365"
+      },
+      {
+        "source": "profile[].anonymize",
+        "target": "sn_anonymizeflag",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].anonymize represents a flag indicating whether the contact should be anonymized, directly corresponding to sn_anonymizeflag in the target"
+      },
+      {
+        "source": "profile[].last_verified",
+        "target": "sn_contactverification",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].last_verified indicates when the contact was last verified, which aligns with the contact verification concept in sn_contactverification"
+      },
+      {
+        "source": "profile[].country",
+        "target": "sn_country (reference via _sn_country_value)",
+        "relation": "maps_to",
+        "transformation": "Lookup country value to resolve reference; do not map raw value directly",
+        "reason": "profile[].country represents the contact's country, which corresponds to the sn_country reference field, but requires a lookup to resolve the reference ID"
+      },
+      {
+        "source": "profile[].validation_flag",
+        "target": "sn_emailvalidationstatus",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].validation_flag represents a validation status indicator for the contact profile, and the target sn_emailvalidationstatus represents email validation status; however, the source is a general validation flag not specific to email, so confidence is medium"
+      },
+      {
+        "source": "profile[].job_function",
+        "target": "sn_jobfunction (reference via _sn_jobfunction_value)",
+        "relation": "maps_to",
+        "transformation": "Lookup reference by job_function value; do not map raw value directly",
+        "reason": "profile[].job_function represents the contact's job function which aligns with the target sn_jobfunction reference field; requires lookup to resolve to the correct reference ID"
+      },
+      {
+        "source": "profile[].job_level",
+        "target": "sn_joblevel (reference via _sn_joblevel_value)",
+        "relation": "maps_to",
+        "transformation": "Lookup reference by job_level value; do not map raw value directly",
+        "reason": "profile[].job_level represents the contact's job level which aligns with the target sn_joblevel reference field; requires lookup to resolve to the correct reference ID"
+      },
+      {
+        "source": "profile[].job_role",
+        "target": "sn_jobrole (reference via _sn_jobrole_value)",
+        "relation": "maps_to",
+        "transformation": "Lookup reference by job_role value; do not map raw value directly",
+        "reason": "profile[].job_role represents the contact's job role which aligns with the target sn_jobrole reference field; requires lookup to resolve to the correct reference ID"
+      },
+      {
+        "source": "profile[].communication[].unsubscribe",
+        "target": "sn_lsdonotcall",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].communication[].unsubscribe could indicate opt-out from communication including calls, but without a type filter to isolate phone communications specifically, this mapping is uncertain and low confidence"
+      },
+      {
+        "source": "profile[].mdm_id",
+        "target": "sn_mdmid",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].mdm_id is the MDM identifier for the contact, directly corresponding to sn_mdmid in Dynamics 365"
+      },
+      {
+        "source": "profile[].lead",
+        "target": "sn_partnerclientlead",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].lead indicates whether the contact is a lead, which aligns with sn_partnerclientlead representing a partner/client lead designation"
+      },
+      {
+        "source": "person_id",
+        "target": "sn_peopleid",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "person_id is the top-level person identifier from the MDM source, mapping to sn_peopleid which represents the person/people ID in the target"
+      },
+      {
+        "source": "profile[].contact_scores",
+        "target": "sn_relationshipstrength",
+        "relation": "maps_to",
+        "transformation": null,
+        "reason": "profile[].contact_scores is a numeric score reflecting the contact's engagement/relationship strength, aligning with sn_relationshipstrength"
+      },
+      {
+        "source": "profile[].state_province_change",
+        "target": "sn_stateprovince (reference via _sn_stateprovince_value)",
+        "relation": "maps_to",
+        "transformation": "Lookup state/province reference record by name/code",
+        "reason": "profile[].state_province_change contains the state or province value which must be resolved to a reference record for sn_stateprovince in Dynamics 365"
+      }
+    ]
+  }
 }
