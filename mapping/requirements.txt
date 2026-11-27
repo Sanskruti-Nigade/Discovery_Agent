@@ -1,0 +1,9 @@
+# Only what the schema-mapping service needs (for running it on its own).
+fastapi
+uvicorn
+psycopg[binary]
+pydantic
+python-dotenv
+pyyaml
+requests
+neo4j

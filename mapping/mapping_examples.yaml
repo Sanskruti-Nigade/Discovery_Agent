@@ -1,0 +1,39 @@
+# Curated examples used in LLM field-mapping prompts.
+# Replace or extend these with domain-owner-approved examples for production.
+examples:
+  - source:
+      id: mdm.product.release
+      name: release
+      data_type: string
+      description: Product platform release
+    target:
+      id: sap_brim.material.RELEASE_FAMILY
+      name: RELEASE_FAMILY
+      data_type: string
+      description: Platform release family
+    score: 0.96
+    reason: Both fields describe the product's platform release.
+  - source:
+      id: mdm.contact.profile[].primary_email
+      name: primary_email
+      data_type: string
+      description: Primary email address for a contact
+    target:
+      id: now_support.contact.EMAIL_ADDR
+      name: EMAIL_ADDR
+      data_type: string
+      description: Email address of the support contact
+    score: 0.98
+    reason: Both fields represent the contact's email address.
+  - source:
+      id: mdm.product.number
+      name: number
+      data_type: string
+      description: Product identifier
+    target:
+      id: now_support.contact.FULL_NAME
+      name: FULL_NAME
+      data_type: string
+      description: Full name of a support contact
+    score: 0.04
+    reason: A product identifier is semantically unrelated to a person's name.

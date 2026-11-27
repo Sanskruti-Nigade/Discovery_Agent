@@ -91,6 +91,24 @@ Questions the chat understands:
 | "Where does primary_email come from" | A lineage answer with the matching columns |
 | "What was the previous type of …" | The change history |
 
+## 5a. React UI and mapping reviews (`ui/`, `mapping/`)
+
+| Command | What it does |
+|---|---|
+| `cd ui` then `npm install` and `npm run build` | Builds the ServiceNow-themed UI into `ui/dist`; the website above then serves it |
+| `cd ui` then `npm run dev` | UI with hot reload on http://localhost:5173 (needs the website on 8080 running) |
+| `python -m pytest tests -q` | Unit tests for schema mapping (no database needed) |
+| `uvicorn mapping.main:app --port 8001` | Optional: run the schema-mapping API on its own (docs at http://localhost:8001/docs) |
+
+| URL | What it is |
+|---|---|
+| http://localhost:8080/reviews | Mapping reviews: batches waiting for approval, and all reviews |
+| `GET /api/schema-mapping/health` | PostgreSQL, Neo4j and LLM-key status (`?strict=true` returns 503 if any is down) |
+| `POST /api/schema-mapping` | LLM maps a source table to the target tables; stores a pending batch in `review_queue` |
+| `GET /api/schema-mapping/approved?since=…` | Approved mappings (`table.column -> table.column`) for loading into Neo4j |
+
+See `mapping/README.md` and `ui/README.md`.
+
 ## 6. Older YAML loader API (`main.py`)
 
 | Command | What it does |

@@ -7,3 +7,5 @@ __pycache__/
 node_modules/
 ai/generated/*
 !ai/generated/.gitkeep
+ui/dist/
+.pytest_cache/
