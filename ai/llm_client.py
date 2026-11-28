@@ -22,7 +22,7 @@ def chat(system: str, user: str, max_tokens: int = 4000) -> str:
         r = requests.post(
             os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1").rstrip("/") + "/messages",
             headers={"x-api-key": _need("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"},
-            json={"model": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5-5"), "max_tokens": max_tokens,
+            json={"model": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-5-5"), "max_tokens": max_tokens,
                   "system": system, "messages": [{"role": "user", "content": user}]},
             timeout=120)
         r.raise_for_status()

@@ -1,7 +1,7 @@
 # Only what the schema-mapping service needs (for running it on its own).
 fastapi
 uvicorn
-psycopg[binary]
+psycopg[binary]>=3.2
 pydantic
 python-dotenv
 pyyaml

@@ -9,3 +9,4 @@ ai/generated/*
 !ai/generated/.gitkeep
 ui/dist/
 .pytest_cache/
+backups/

@@ -355,3 +355,80 @@ def test_graph_update_uses_the_shared_lineage_model(monkeypatch):
         ("mdm_product_api.model_product.id", "snowflake.dim_model.model_class", 8)]
     assert {r["type"] for r in g["relationships"]} == {"OWNS", "HAS_COLUMN", "MAPS_TO"}
     assert all("on_create_only" not in r for r in maps)
+
+
+# ---------------------------------------------------------------- change_diff scope + decided pairs
+def test_new_version_sends_only_changed_fields_to_the_llm(monkeypatch, world):
+    monkeypatch.setattr(sm.store, "connect", lambda: FakeDB())
+    monkeypatch.setattr(sm, "_change_scope", lambda source, scope: {
+        "mode": "changes_only", "changed": {"MODEL_PRODUCT.ID": "added"}, "removed": ["OLD.FIELD"]})
+
+    result = sm.generate("product_api")
+
+    assert [f["field_path"] for f in world[0][0]["fields"]] == ["MODEL_PRODUCT.ID"]
+    assert result["mapping"] == ["model_product.id -> dim_model.model_id"]
+    assert result["scope"] == {"mode": "changes_only", "fields_sent_to_llm": 1, "fields_in_table": 4,
+                               "changed_fields": ["MODEL_PRODUCT.ID"], "removed_fields": ["OLD.FIELD"]}
+
+
+def test_only_removed_fields_means_no_llm_call(monkeypatch, world):
+    monkeypatch.setattr(sm.store, "connect", lambda: FakeDB())
+    monkeypatch.setattr(sm, "_change_scope", lambda source, scope: {"mode": "changes_only", "changed": {}, "removed": ["X"]})
+
+    result = sm.generate("product_api")
+
+    assert world == [] and result["status"] == "nothing_to_map" and result["batch_id"] is None
+    assert result["scope"]["removed_fields"] == ["X"]
+
+
+def test_already_decided_pairs_are_not_proposed_again(monkeypatch, world):
+    db = FakeDB()
+    monkeypatch.setattr(sm.store, "connect", lambda: db)
+    monkeypatch.setattr(sm, "_decided_pairs", lambda keys: {("mdm.product.MODEL_PRODUCT.ID", "snowflake.dim_model.model_id")})
+
+    result = sm.generate("product_api")
+
+    assert result["mapping"] == ["entitlement_product_lifecycle.geography -> fact_product_lifecycle.geography"]
+    assert result["already_decided"] == ["mdm.product.MODEL_PRODUCT.ID -> snowflake.dim_model.model_id"]
+    assert result["llm"]["already_decided"] == 1
+
+
+def test_type_change_reopens_a_decided_pair_and_full_scope_ignores_history(monkeypatch, world):
+    monkeypatch.setattr(sm.store, "connect", lambda: FakeDB())
+    monkeypatch.setattr(sm, "_decided_pairs", lambda keys: {("mdm.product.MODEL_PRODUCT.ID", "snowflake.dim_model.model_id")})
+    monkeypatch.setattr(sm, "_change_scope", lambda source, scope: {
+        "mode": "changes_only", "changed": {"MODEL_PRODUCT.ID": "type_changed"}, "removed": []})
+    assert sm.generate("product_api")["mapping"] == ["model_product.id -> dim_model.model_id"]
+
+    monkeypatch.setattr(sm, "_change_scope", lambda source, scope: {"mode": "full", "changed": None, "removed": []})
+    monkeypatch.setattr(sm, "_decided_pairs", lambda keys: pytest.fail("full scope must not filter"))
+    assert len(sm.generate("product_api", scope="full")["mapping"]) == 2
+
+
+class ScopeDB(FakeDB):
+    def __init__(self, prior, diffs):
+        super().__init__()
+        self.prior, self.diffs = prior, diffs
+
+    def execute(self, sql, params=None):
+        flat = " ".join(sql.split())
+        if "source_object_version')::int <" in flat:
+            return Result(row={"x": 1} if self.prior else None)
+        if flat.startswith("SELECT field_path, change_type FROM change_diff"):
+            return Result(rows=self.diffs)
+        return super().execute(sql, params)
+
+
+@pytest.mark.parametrize("version, prior, diffs, mode", [
+    (1, True, [{"field_path": "a", "change_type": "added"}], "full"),           # first version
+    (2, False, [{"field_path": "a", "change_type": "added"}], "full"),          # never mapped before
+    (2, True, [], "full"),                                                       # no diff recorded
+    (2, True, [{"field_path": "a", "change_type": "added"}, {"field_path": "b", "change_type": "removed"},
+               {"field_path": "c", "change_type": "type_changed"}], "changes_only"),
+])
+def test_change_scope(monkeypatch, version, prior, diffs, mode):
+    monkeypatch.setattr(sm.store, "connect", lambda: ScopeDB(prior, diffs))
+    out = sm._change_scope({"object_id": "mdm.product_api", "version": version, "snapshot_id": 9}, "auto")
+    assert out["mode"] == mode
+    if mode == "changes_only":
+        assert out["changed"] == {"a": "added", "c": "type_changed"} and out["removed"] == ["b"]

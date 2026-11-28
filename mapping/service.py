@@ -114,7 +114,8 @@ def _load(types: list[str]) -> list[dict]:
         by_snapshot.setdefault(f["snapshot_id"], []).append({
             "field_path": f["field_path"], "field_key": f["graph_field_key"], "data_type": f["data_type"],
             "description": f["description"], "max_length": f["max_length"]})
-    return [{**_object_row(o), "fields": by_snapshot.get(o["snapshot_id"], [])} for o in objects]
+    return [{**_object_row(o), "snapshot_id": o["snapshot_id"], "fields": by_snapshot.get(o["snapshot_id"], [])}
+            for o in objects]
 
 
 def _resolve_source(name: str, sources: list[dict]) -> dict:
@@ -169,11 +170,70 @@ def _llm_view(obj: dict) -> dict:
                        for f in obj["fields"]]}
 
 
+# change_diff rows that need a (new) mapping; 'removed' fields are reported, renames arrive as removed + added
+MAPPABLE_CHANGES = ("added", "type_changed", "length_changed")
+
+PRIOR_MAPPING = """
+SELECT 1 FROM review_queue
+WHERE evidence->>'source' = 'schema_mapping' AND evidence->>'source_object_id' = %s
+  AND evidence->>'source_object_version' ~ '^[0-9]+$' AND (evidence->>'source_object_version')::int < %s
+LIMIT 1
+"""
+
+DECIDED_PAIRS = """
+SELECT DISTINCT from_field_key, to_field_key FROM review_queue
+WHERE link_type = 'MAPS_TO' AND status IN ('approved', 'rejected') AND from_field_key = ANY(%s)
+"""
+
+
+def _change_scope(source: dict, scope: str) -> dict:
+    """Which source fields go to the LLM.
+
+    full:         every field (first mapping of a source, or scope='full').
+    changes_only: a new version of a source that was mapped before -> only the fields change_diff lists as
+                  added / type_changed / length_changed for this snapshot (version N-1 -> N, written by ingestion).
+    """
+    out = {"mode": "full", "changed": None, "removed": []}
+    if scope == "full" or source["version"] <= 1:
+        return out
+    with store.connect() as conn:
+        if not conn.execute(PRIOR_MAPPING, (source["object_id"], source["version"])).fetchone():
+            return out  # never mapped before: map the whole table
+        diffs = conn.execute("SELECT field_path, change_type FROM change_diff WHERE to_snapshot_id = %s",
+                             (source["snapshot_id"],)).fetchall()
+    if not diffs:
+        return out  # no diff recorded for this snapshot: be safe, map everything
+    return {"mode": "changes_only",
+            "changed": {d["field_path"]: d["change_type"] for d in diffs if d["change_type"] in MAPPABLE_CHANGES},
+            "removed": sorted(d["field_path"] for d in diffs if d["change_type"] == "removed")}
+
+
+def _decided_pairs(source_keys: list[str]) -> set[tuple[str, str]]:
+    """(source key, target key) pairs a reviewer already approved or rejected."""
+    if not source_keys:
+        return set()
+    with store.connect() as conn:
+        return {(r["from_field_key"], r["to_field_key"]) for r in conn.execute(DECIDED_PAIRS, (source_keys,)).fetchall()}
+
+
 def generate(source_name: str, *, target_object_ids: list[str] | None = None, min_conf: float = 0.6,
-             requested_by: str | None = None) -> dict:
+             requested_by: str | None = None, scope: str = "auto") -> dict:
+    """scope 'auto': whole table the first time, then only the fields change_diff reports for the new version;
+    pairs a reviewer already approved or rejected are not proposed again (unless that source field's type changed).
+    scope 'full': the whole table and every pair, regardless of history."""
+    if scope not in ("auto", "full"):
+        raise SchemaMappingError("scope must be 'auto' or 'full'")
     source = _resolve_source(source_name, _load(["table", "api"]))
     if not source["fields"]:
         raise SchemaMappingError(f"Source {source['object_id']!r} has no fields in schema_field.")
+    change = _change_scope(source, scope)
+    all_fields = source["fields"]
+    if change["mode"] == "changes_only":
+        source = {**source, "fields": [f for f in all_fields if f["field_path"] in change["changed"]]}
+        if not source["fields"]:
+            log.info("Schema mapping: %s v%s has no added or changed fields; nothing to map (removed: %s)",
+                     source["object_id"], source["version"], change["removed"])
+            return _empty_result(source, change, len(all_fields), min_conf)
     targets = _load(["target_object"])
     if target_object_ids:
         unknown = sorted(set(target_object_ids) - {t["object_id"] for t in targets})
@@ -190,6 +250,9 @@ def generate(source_name: str, *, target_object_ids: list[str] | None = None, mi
             "pass target_object_ids to choose the target tables.")
 
     suggestions = llm_client.map_schemas(_llm_view(source), [_llm_view(t) for t in targets])
+    decided = set() if scope == "full" else _decided_pairs([f["field_key"] for f in source["fields"]])
+    retyped = {p for p, kind in (change["changed"] or {}).items() if kind != "added"}
+    already_decided = []
 
     short_names = [t["object_id"].split(".", 1)[-1] for t in targets]
     ambiguous = {n for n in short_names if short_names.count(n) > 1}
@@ -197,14 +260,23 @@ def generate(source_name: str, *, target_object_ids: list[str] | None = None, mi
     target_fields = {f["field_key"]: (t, f) for t in targets for f in t["fields"]}
     batch_id = str(uuid.uuid4())
     mappings: dict[tuple[str, str], dict] = {}
-    dropped = 0
+    dropped, low, invalid = 0, 0, []
     for s in suggestions:
         pair = (s["source_field_key"], s["target_field_key"])
         if pair[0] not in source_fields or pair[1] not in target_fields:
             log.warning("LLM proposed a field that is not in the schemas source=%s target=%s", *pair)
             dropped += 1
+            if len(invalid) < 5:
+                invalid.append(f"{pair[0]} -> {pair[1]}")
             continue
-        if s["confidence"] < min_conf or pair in mappings:
+        if s["confidence"] < min_conf:
+            low += 1
+            continue
+        if pair in mappings:
+            continue
+        if pair in decided and source_fields[pair[0]]["field_path"] not in retyped:
+            if f"{pair[0]} -> {pair[1]}" not in already_decided:
+                already_decided.append(f"{pair[0]} -> {pair[1]}")
             continue
         src = source_fields[pair[0]]
         tgt_obj, tgt = target_fields[pair[1]]
@@ -238,7 +310,28 @@ def generate(source_name: str, *, target_object_ids: list[str] | None = None, mi
         "mapping": [m["mapping"] for m in stored],
         "mappings": [_public_mapping(m) for m in stored],
         "already_pending": already_pending,
+        "already_decided": already_decided,
+        "scope": _scope_info(change, len(all_fields), len(source["fields"])),
+        # what happened to the LLM's proposals (explains an empty batch)
+        "llm": {"proposed": len(suggestions), "unknown_fields": dropped, "below_min_conf": low,
+                "already_decided": len(already_decided), "min_conf": min_conf, "unknown_field_examples": invalid},
     }
+
+
+def _scope_info(change: dict, total_fields: int, sent_fields: int) -> dict:
+    return {"mode": change["mode"], "fields_sent_to_llm": sent_fields, "fields_in_table": total_fields,
+            "changed_fields": sorted(change["changed"] or []), "removed_fields": change["removed"]}
+
+
+def _empty_result(source: dict, change: dict, total_fields: int, min_conf: float) -> dict:
+    """A new version with only removed fields: no LLM call, no batch."""
+    return {"batch_id": None, "status": "nothing_to_map",
+            "source": {k: source[k] for k in ("object_id", "object_type", "version", "system", "entity",
+                                              "table_name", "field_count")},
+            "target_object_ids": [], "target_fields_considered": 0, "mapping": [], "mappings": [],
+            "already_pending": [], "already_decided": [], "scope": _scope_info(change, total_fields, 0),
+            "llm": {"proposed": 0, "unknown_fields": 0, "below_min_conf": 0, "already_decided": 0,
+                    "min_conf": min_conf, "unknown_field_examples": []}}
 
 
 def _public_mapping(m: dict) -> dict:

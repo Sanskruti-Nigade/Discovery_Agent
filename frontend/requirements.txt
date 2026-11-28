@@ -3,5 +3,5 @@ uvicorn
 neo4j
 python-dotenv
 requests
-psycopg[binary]
+psycopg[binary]>=3.2
 pyyaml

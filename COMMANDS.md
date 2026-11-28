@@ -98,6 +98,11 @@ Questions the chat understands:
 | `cd ui` then `npm install` and `npm run build` | Builds the ServiceNow-themed UI into `ui/dist`; the website above then serves it |
 | `cd ui` then `npm run dev` | UI with hot reload on http://localhost:5173 (needs the website on 8080 running) |
 | `python -m pytest tests -q` | Unit tests for schema mapping (no database needed) |
+| `python -m mapping.admin reset-reviews --yes` | Backs up (to `backups/`) and deletes all rows of `review_queue` / `review_decision` |
+| `python mapping/generate_mappings.py` | Reads source tables from Postgres and calls the mapping API for each unmapped one (`--list`, `--all`, `--source X`) |
+| `python -m mapping.trigger install` | Once: Postgres trigger that announces every new source table snapshot |
+| `python -m mapping.trigger run` | Keep running: maps new/changed source tables automatically via the mapping endpoint |
+| `python -m mapping.trigger status` | Trigger installed? Which source tables still have no mapping? |
 | `uvicorn mapping.main:app --port 8001` | Optional: run the schema-mapping API on its own (docs at http://localhost:8001/docs) |
 
 | URL | What it is |

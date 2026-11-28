@@ -93,7 +93,7 @@ def llm_provider() -> str:
 
 
 def _llm_model(provider: str) -> str | None:
-    return {"anthropic": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-sonnet-5-5"),
+    return {"anthropic": os.getenv("ANTHROPIC_CHAT_MODEL", "claude-haiku-5-5"),
             "openai": os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             "azure": os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT"),
             "llama": os.getenv("LLAMA_MODEL", "llama3.1:8b")}.get(provider)

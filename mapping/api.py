@@ -20,6 +20,9 @@ class GenerateRequest(BaseModel):
     target_object_ids: list[str] | None = None
     min_conf: float = Field(0.6, ge=0, le=1)
     requested_by: str | None = None
+    # auto: whole table the first time, afterwards only fields change_diff reports for the new version;
+    # full: whole table, and re-propose pairs that were already approved/rejected
+    scope: str = Field("auto", pattern="^(auto|full)$")
 
 
 class DecisionRequest(BaseModel):
@@ -58,7 +61,7 @@ def generate(req: GenerateRequest):
     """Read both schemas from Postgres, ask the LLM for mappings, store them as one pending batch."""
     try:
         return _db(service.generate, req.source, target_object_ids=req.target_object_ids,
-                   min_conf=req.min_conf, requested_by=req.requested_by)
+                   min_conf=req.min_conf, requested_by=req.requested_by, scope=req.scope)
     except service.SourceNotFoundError as e:
         raise HTTPException(404, str(e))
     except service.SchemaMappingError as e:

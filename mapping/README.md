@@ -29,6 +29,9 @@ the same format as `lineage/json_files/mapping.json`.
 | `llm.py` | `map_schemas()` prompt + validation. Uses the shared `ai/llm_client.chat` (`LLM_PROVIDER` in `.env`) |
 | `service.py` | generate, list/read batches and reviews, decide, approved feed |
 | `api.py` | The HTTP endpoints (FastAPI router under `/api/schema-mapping`) |
+| `generate_mappings.py` | Script: reads source tables from Postgres, calls the mapping API for each |
+| `trigger.py` | Postgres trigger + listener: new source snapshot -> `POST /api/schema-mapping` automatically |
+| `admin.py` | `reset-reviews`: back up and empty `review_queue` / `review_decision` |
 | `health.py` | Health check: PostgreSQL, Neo4j and LLM key (`/api/schema-mapping/health`) |
 | `main.py`, `requirements.txt`, `Dockerfile` | Run the endpoints as a standalone microservice |
 | `mapping_examples.yaml` | Curated scoring examples sent with every prompt |
@@ -43,6 +46,27 @@ cd frontend && python -m uvicorn app:app --port 8080
 Uses the existing discovery tables only (created by the discovery-service migrations): `metadata_snapshot`,
 `schema_field` (filled by the ingestion job), `review_queue`, `review_decision`. Nothing here creates tables.
 Offline: set `MAPPING_LLM_PROVIDER=stub` and run the discovery-service `llm-stub` container (`LLM_BASE_URL`).
+
+## PostgreSQL tables used
+
+Follows the data-engineering design (metadata flow `source_registry -> ingestion_run -> metadata_snapshot ->
+schema_field -> change_diff`; review tables for the workflow). This module never writes the metadata tables.
+
+| Table | How `mapping/` uses it |
+|---|---|
+| `metadata_snapshot` | **Read.** Latest version per `object_id` for the current `ENVIRONMENT`. `object_type` table/api = source, `target_object` = target. The trigger listens for inserts here. |
+| `schema_field` | **Read.** The fields of each snapshot (path, key, data type, description) are what the LLM maps. |
+| `change_diff` | **Read.** For a new version of a source that was mapped before, only fields listed as `added` / `type_changed` / `length_changed` for that snapshot go to the LLM; `removed` fields are reported. (Ingestion records a rename as removed + added.) |
+| `review_queue` | **Write.** One `pending` row per proposed mapping (`link_type` MAPS_TO, `confidence`, `evidence` = batch id, source version, mapping text, LLM reason, field metadata). Status becomes `approved` / `rejected`. |
+| `review_decision` | **Write.** One row per decided mapping: decision, reviewer, comment, time. |
+| `source_registry`, `ingestion_run` | Not used (ingestion's bookkeeping). |
+| `reconciliation_run`, `feedback` | Not used by mapping. |
+
+Rules:
+- **First mapping of a source:** the whole table is mapped.
+- **New version:** only the changed fields (per `change_diff`) are mapped.
+- **Decided pairs:** a pair a reviewer already approved or rejected is not proposed again, unless that source field's type changed. Pairs still pending are never duplicated.
+- **`scope: "full"`** (script `--full`): map the whole table and ignore that history.
 
 ## Two ways to run it
 
@@ -70,6 +94,59 @@ docker run -p 8001:8001 --env-file .env schema-mapping
 Environment: `PG_DSN` (or `POSTGRES_*`), `ENVIRONMENT`, the LLM variables above, `CORS_ALLOW_ORIGINS`
 (default `http://localhost:5173,http://localhost:8080`), `LOG_LEVEL`. Point the UI at it with
 `VITE_MAPPING_API_BASE=http://localhost:8001` in `ui/.env` and rebuild.
+
+## Generate mappings with a script (`generate_mappings.py`)
+
+Reads the source tables (latest snapshot of each table/API in `metadata_snapshot`) and calls
+`POST /api/schema-mapping` for each; the API stores the mappings as pending batches in `review_queue`.
+The website (or the standalone service) must be running.
+
+```bash
+python mapping/generate_mappings.py --list                 # source tables and whether they're mapped; no calls
+python mapping/generate_mappings.py                        # every source whose latest version has no mapping yet
+python mapping/generate_mappings.py --all                  # every source table again
+python mapping/generate_mappings.py --source mdm.product_api --targets snowflake.dim_model
+python mapping/generate_mappings.py --source mdm.product_api --full   # whole table, ignore decided pairs
+```
+
+`--api-url` (default `MAPPING_API_URL` or `http://localhost:8080`), `--min-conf` (0.6), `--requested-by`
+(default your login name). Tables with no fields are skipped. Exit code 1 if any call failed.
+
+## Automatic mapping on ingestion (`trigger.py`)
+
+When the ingestion job writes a source table/API to `metadata_snapshot` (first ingestion or a new schema version),
+a PostgreSQL trigger sends a `NOTIFY` on channel `schema_mapping_source`. The listener receives it and calls the
+mapping endpoint with the table name, `POST {MAPPING_API_URL} {"source": "<object_id>"}`, which stores a pending
+batch for review. (Postgres can't call HTTP itself, so the trigger only notifies.)
+
+```bash
+python -m mapping.trigger install     # once: trigger + function on metadata_snapshot
+python -m mapping.trigger run         # keep running next to the API (catches up on start, then listens)
+python -m mapping.trigger status      # trigger installed? which sources still need a mapping?
+python -m mapping.trigger catch-up    # one pass over unmapped sources, then exit (exit code 1 if any failed)
+python -m mapping.trigger uninstall
+```
+
+- Each (source, version) is mapped once; a batch for that version in `review_queue` means done. A new version is
+  mapped again, and pairs that are already pending are not duplicated.
+- Debounced 30 s (`MAPPING_TRIGGER_DEBOUNCE_SECONDS`) so an ingestion run that writes the source and then the
+  targets triggers one call, after it finishes. "No target tables yet" waits for the next target snapshot.
+- LLM / network errors retry with backoff (`MAPPING_TRIGGER_RETRY_SECONDS` 300, `MAPPING_TRIGGER_MAX_ATTEMPTS` 5);
+  unknown source or too many target fields are logged and not retried.
+- Only snapshots of `ENVIRONMENT` are handled. Batches are tagged `requested_by: svc-schema-mapping-trigger`.
+- `MAPPING_API_URL` defaults to `http://localhost:8080/api/schema-mapping`; for the standalone service use
+  `http://localhost:8001/api/schema-mapping`. With Docker, run the same image with
+  `python -m mapping.trigger run` as the command.
+
+## Resetting the review tables (`admin.py`)
+
+```bash
+python -m mapping.admin reset-reviews                     # dry run: row counts only
+python -m mapping.admin reset-reviews --yes --restart-ids # JSON backup in ./backups, then delete all rows
+```
+
+Deletes every row of `review_decision` and `review_queue` (one transaction, backup first). Run it before
+`python -m mapping.trigger run` so the catch-up generates the initial mapping for every source table.
 
 ## Health check: `GET /api/schema-mapping/health`
 
@@ -100,7 +177,7 @@ in parallel with a 5 s timeout each (`HEALTH_TIMEOUT_SECONDS`):
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/sources`, `/targets` | Latest source (table/api) and target snapshots |
-| POST | `` | `{"source","target_object_ids"?,"min_conf"?,"requested_by"?}` -> LLM -> new pending batch |
+| POST | `` | `{"source","target_object_ids"?,"min_conf"?,"requested_by"?,"scope"?: "auto"\|"full"}` -> LLM -> new pending batch |
 | GET | `/summary` | Counts by status + batches waiting for approval |
 | GET | `/batches?status=pending\|approved\|rejected\|all` | Batches, newest first |
 | GET | `/batches/{batch_id}` | One batch with every mapping, its latest decision and `graph_update` (preview in the shared Neo4j model) |
