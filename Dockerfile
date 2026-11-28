@@ -9,6 +9,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
+COPY graphload ./graphload
+COPY ai ./ai
 COPY yml_files ./yml_files
 
 RUN useradd --create-home appuser && chown -R appuser /app

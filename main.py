@@ -1,3 +1,4 @@
+import hmac
 import json
 import os
 import sys
@@ -6,7 +7,7 @@ from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 import psycopg2
 import psycopg2.extras
 from neo4j import GraphDatabase
@@ -253,6 +254,39 @@ def load_pipeline(
             driver.close()
     return {"dry_run": dry_run, "cypher_file": str(out), "changes": totals, "attempts": attempt + 1,
             "statements": len([s for s in cypher.split(";") if s.strip()])}
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)):
+    """If API_KEY is set in the environment, callers must send it as the X-API-Key header."""
+    expected = os.getenv("API_KEY")
+    if expected and not (x_api_key and hmac.compare_digest(x_api_key, expected)):
+        raise HTTPException(401, "invalid or missing API key")
+
+
+@app.post("/load/generic", dependencies=[Depends(require_api_key)])
+def load_generic(
+    source_file: str = "Source.json",
+    target_file: str = "Target.json",
+    mapping_file: str | None = "mappping.json",
+    dry_run: bool = False,
+    prune: bool = False,
+    llm_model: bool = False,
+    confirm: bool = False,
+    remap_all: bool = False,
+):
+    """Deterministic loader for ANY nested JSON/YAML (package graphload). Files must be inside DUMMY_DIR."""
+    import graphload
+    folder = os.getenv("DUMMY_DIR", "DummyData")
+    try:
+        src, tgt = (graphload.reader.resolve_inside(folder, n) for n in (source_file, target_file))
+        mapping = graphload.reader.resolve_inside(folder, mapping_file) if mapping_file else None
+        return graphload.load(src, tgt, mapping, dry_run=dry_run, prune=prune, llm_model=llm_model,
+                              decision="remap" if remap_all else "apply" if confirm else None)
+    except graphload.ChangeConfirmationRequired as e:  # nothing was written; the caller must choose
+        raise HTTPException(409, {"message": str(e), "changes": e.plan.to_dict()["systems"],
+                                  "how": "repeat the call with confirm=true to accept, or remap_all=true to rebuild everything"})
+    except graphload.LoadError as e:  # messages are written to be safe for callers
+        raise HTTPException(400, str(e))
 
 
 # ---------------------------- PostgreSQL (read-only) ----------------------------

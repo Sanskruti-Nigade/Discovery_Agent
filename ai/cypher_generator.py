@@ -26,10 +26,16 @@ Edges: (System)-[:OWNS]->(Table)  (Table)-[:HAS_COLUMN]->(Column)  (Column)-[:HA
 RULES:
 - Output ONLY Cypher, statements separated by semicolons. No prose, no markdown fences.
 - Use MERGE only (never CREATE/DELETE/REMOVE/DROP/CALL). Re-running must not duplicate anything.
+- Always bind a variable to a node before SET / ON CREATE SET / ON MATCH SET, e.g.
+  MERGE (s:SourceSystem {name:'X'}) SET s.type = 'Y'   -- never "SET name='X'" without a variable.
 - MERGE nodes on their identity keys: System(name), Table(system,name), Column(system,table,name), Property(key,value).
 - Put non-identity properties in SET. A MAPS_TO edge is MERGEd on (from, to, mapping_name).
-- Every MAPS_TO endpoint must be a Column declared in the data. If a mapping references a table or column that
-  does not exist in the data, output exactly one line: // ERROR: <what is missing>  and nothing else.
+- The data was already validated by code: every mapping "from"/"to" is "<table>.<column>" of the source/target
+  system. Trust it, never output an error line, and never skip or comment out entries. Column names may contain
+  characters like [] ' = & @ . and spaces: they are plain strings, pass them through unchanged as map-literal values
+  (escape quotes). If the request has NO "tables" content (only "mapping"), the nodes already exist: MATCH the two
+  Column nodes by (system, table, name) and MERGE only the MAPS_TO edge.
+- If a mapping "from"/"to" has no matching Column anywhere, it was already filtered out; just continue.
 - For every Column that has a data type, also set Column.data_type AND MERGE a (:Property {key:'data_type', value:<type>})
   linked with (Column)-[:HAS_PROPERTY]->(Property), so the type is visible in the graph. If a column's type is not
   stated in the data, assume 'string' only when the values are all strings.
@@ -81,7 +87,10 @@ def validate(cypher: str) -> None:
         raise ValueError("no MERGE statement generated")
 
 
-def generate(data_text: str, retries: int = 1) -> str:
+CHECK = None  # optional callable(cypher) that raises ValueError on a syntax problem (set by sync.py)
+
+
+def generate(data_text: str, retries: int = 3) -> str:
     return generate_with(SYSTEM_PROMPT, f"DATA:\n{data_text}", retries)
 
 
@@ -93,6 +102,8 @@ def generate_with(system_prompt: str, user_text: str, retries: int = 1) -> str:
                                    f"{prompt}\n\nYour previous output was rejected: {err}\nFix it.", max_tokens=12000))
         try:
             validate(cypher)
+            if CHECK:
+                CHECK(cypher)  # e.g. ask Neo4j to EXPLAIN it: catches syntax errors before anything runs
             return cypher
         except ValueError as e:
             err = str(e)
